@@ -1,0 +1,143 @@
+name: Deploy N8N in EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      account_name:
+        description: "AWS Account"
+        required: false
+        type: choice
+        options:
+          - live
+          - nonlive
+          - livedr
+        default: "nonlive"
+      cluster_name:
+        description: "cluster name for your environment"
+        required: false
+        default: "lighthouse-tools-nonlive"
+  push:
+    branches:
+      - main
+concurrency:
+  group: n8n-deployment
+  cancel-in-progress: false
+
+permissions: write-all
+
+env:
+  product: "n8n"
+  podsecurity: "privileged"
+  n8n_namespace: "n8n"
+  helm_chart_version: "1.16.22"
+
+jobs:
+
+  deploy_n8n:
+    runs-on: [self-hosted, Linux]
+    defaults:
+      run:
+        working-directory: helm/n8n
+    outputs:
+      helm_deploy: ${{ steps.helm_deploy.outcome }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Map account name to account number
+        run: |
+          case "${{ github.event.inputs.account_name }}" in
+            live)   echo "AWS_ACCOUNT_NUMBER=779192211274" >> "$GITHUB_ENV" ;;
+            livedr) echo "AWS_ACCOUNT_NUMBER=741385553556" >> "$GITHUB_ENV" ;;
+            nonlive) echo "AWS_ACCOUNT_NUMBER=192256166295" >> "$GITHUB_ENV" ;;
+          esac
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.19.0"
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.23.6"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: eu-central-1
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_NUMBER }}:role/github_workflow_role
+          role-session-name: HelmDeploymentSessions
+
+      - name: Set k8s context
+        run: aws eks --region eu-central-1 update-kubeconfig --name "lighthouse-tools-${{ github.event.inputs.account_name }}"
+
+      - name: Create n8n namespace
+        run: |
+          kubectl get namespace ${{ env.n8n_namespace }} || kubectl create namespace ${{ env.n8n_namespace }}
+
+      - name: Enforce pod security on namespace
+        run: |
+          kubectl label ns ${{ env.n8n_namespace }} pod-security.kubernetes.io/enforce=${{ env.podsecurity }} pod-security.kubernetes.io/audit=restricted pod-security.kubernetes.io/warn=restricted --overwrite
+
+      - name: Create secret to store db credentials
+        run: |
+          kubectl get secret n8n-postgres -n ${{ env.n8n_namespace }} || \
+          kubectl create secret generic n8n-postgres --from-literal=password="${{ secrets.N8N_DB_PASSWORD }}" -n ${{ env.n8n_namespace }}
+
+      - name: Dry Run
+        id: helm_dry_run
+        #if: steps.helm_diff.outputs.exit_status == 2
+        run: |
+          set -euo pipefail
+          helm repo add n8n https://community-charts.github.io/helm-charts
+          helm repo update
+          helm plugin install https://github.com/databus23/helm-diff
+          helm upgrade --install --dry-run n8n n8n/n8n --version ${{ env.helm_chart_version }} --values "${{ github.event.inputs.account_name }}/values.yaml" --set postgresql.auth.password=${{ secrets.N8N_DB_PASSWORD }} -n ${{ env.n8n_namespace }}
+
+      - name: Start deployment
+        if: steps.helm_dry_run.outcome == 'success'
+        uses: bobheadxi/deployments@v1
+        id: deployment
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: ${{ env.product }}-${{ github.event.inputs.account_name }}
+
+      - name: Deploy
+        id: helm_deploy
+        if: steps.helm_dry_run.outcome == 'success'
+        run: |
+          helm upgrade --install n8n n8n/n8n --version ${{ env.helm_chart_version }} --values "${{ github.event.inputs.account_name }}/values.yaml" -n ${{ env.n8n_namespace }}
+
+      - name: Update deployment status
+        uses: bobheadxi/deployments@v1
+        if: always() && steps.helm_deploy.outcome != 'skipped'
+        with:
+          step: finish
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ steps.helm_deploy.outcome }}
+          env: ${{ steps.deployment.outputs.env }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+
+      - name: Check deployment status
+        id: check_deploy_status
+        run: |
+          SERVICE_FAILED_DEPLOYMENTS_COUNT=0
+
+          DEPLOYMENTS_LIST=$(kubectl get deployments -n "${{ env.product }}" -o name)
+
+          for DEPLOYMENT in $DEPLOYMENTS_LIST; do
+            kubectl rollout status "$DEPLOYMENT" -n "${{ env.product }}" --timeout=10m
+            ROLLOUT_STATUS=$?
+            SERVICE_FAILED_DEPLOYMENTS_COUNT=$((SERVICE_FAILED_DEPLOYMENTS_COUNT + ROLLOUT_STATUS))
+          done
+
+          echo "#### Failed Deployment Count is $SERVICE_FAILED_DEPLOYMENTS_COUNT ####"
+          if [ "$SERVICE_FAILED_DEPLOYMENTS_COUNT" -ne 0 ]; then
+            echo "Deployment Failed"
+            exit 1
+          fi
+
+          echo "#### Deployment Successful ####"

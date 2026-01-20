@@ -1,0 +1,67 @@
+image:
+  repository: n8nio/n8n
+  tag: "2.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-policy: "ELBSecurityPolicy-FS-1-2-Res-2020-10"
+    alb.ingress.kubernetes.io/certificate-arn: 'arn:aws:acm:eu-central-1:192256166295:certificate/48f65c44-755f-496f-80b6-6e6e9b89ef9b'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: n8n
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/load-balancer-attributes: "routing.http.drop_invalid_header_fields.enabled=true,deletion_protection.enabled=true,access_logs.s3.enabled=true,access_logs.s3.bucket=lighthouse-tools-nonlive-192256166295-eu-central-1-access-logs,access_logs.s3.prefix=n8n-nonlive,idle_timeout.timeout_seconds=120"
+    alb.ingress.kubernetes.io/security-groups: "sg-06b43116199ee8f4a"
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "false"
+    alb.ingress.kubernetes.io/ip-address-type: dualstack
+    alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:eu-central-1:192256166295:regional/webacl/lighthouse-tools-nonlive/c719f81b-3898-4ee4-b764-9cd56667d1ca"
+  hosts:
+    - host: n8n.nonlive.lighthouse.services.otto-payments.de
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: n8n-tls
+      hosts:
+        - n8n.nonlive.lighthouse.services.otto-payments.de
+
+db:
+  type: postgresdb
+  logging:
+    enabled: true
+    options: error
+    maxQueryExecutionTime: 1000
+
+postgresql:
+  enabled: true
+  architecture: standalone
+  auth:
+    database: n8n
+    username: n8n
+    
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+taskRunners:
+  mode: internal
+  maxConcurrency: 5
+  taskTimeout: 60
+  taskHeartbeatInterval: 30
