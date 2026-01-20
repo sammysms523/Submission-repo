@@ -1,0 +1,56 @@
+image:
+  repository: n8nio/n8n
+  tag: "2.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+  hosts:
+    - host: submission
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: n8n-tls
+      hosts:
+        - submission
+
+db:
+  type: postgresdb
+  logging:
+    enabled: true
+    options: error
+    maxQueryExecutionTime: 1000
+
+postgresql:
+  enabled: true
+  architecture: standalone
+  auth:
+    database: n8n
+    username: n8n
+    
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+taskRunners:
+  mode: internal
+  maxConcurrency: 5
+  taskTimeout: 60
+  taskHeartbeatInterval: 30

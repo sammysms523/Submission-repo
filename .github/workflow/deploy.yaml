@@ -1,3 +1,7 @@
+# automated github workflow that will deploy the infra in 
+# aws account using a designated github_workflow_role
+# this will prevent using long term credentials
+
 name: Deploy Infra
 
 on:
