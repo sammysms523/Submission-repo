@@ -1,3 +1,4 @@
+# using community chart for n8n deployment
 image:
   repository: n8nio/n8n
   tag: "2.0.0"

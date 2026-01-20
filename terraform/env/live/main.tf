@@ -1,3 +1,4 @@
+# calling vpc and eks module to create vpc and eks cluster
 module "vpc" {
   source = "../../modules/vpc"
 

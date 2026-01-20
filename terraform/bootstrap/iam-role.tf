@@ -1,3 +1,4 @@
+# creating iam role for github_workflow_role
 data "aws_iam_policy_document" "assume_pipeline_role" {
   statement {
     effect  = "Allow"
