@@ -9,6 +9,14 @@ variable "home_region" {
   default = "ap-south-1"
 }
 
+variable "cluster_name" {
+  type        = string
+  description = "Cluster name"
+  default = "Submission-cluster-live"
+}
+
+
+
 variable "env" {
   default = "live"
 }

@@ -2,6 +2,8 @@ resource "aws_eip" "nat" {
   count = 2
 }
 
+data "aws_caller_identity" "current" {}
+
 module "vpc" {
   source  = "registry.terraform.io/terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
@@ -53,4 +55,35 @@ module "vpc" {
   public_route_table_tags = {
     Tier = "public"
   }
+}
+
+output "nat_public_ips" {
+  value = module.vpc.nat_public_ips
+}
+
+output "vpc_id" {
+  value = module.vpc.vpc_id
+}
+
+output "public_subnet_ids" {
+  value = module.vpc.public_subnets
+}
+
+output "private_subnet_ids" {
+  value = module.vpc.private_subnets
+}
+
+output "database_subnets_ids" {
+  value = module.vpc.database_subnets
+}
+output "vpc_cidr_block" {
+  value = module.vpc.vpc_cidr_block
+}
+
+output "vpc_ipv6_cidr_block" {
+  value = module.vpc.vpc_ipv6_cidr_block
+}
+
+output "private_cidr_blocks" {
+  value = module.vpc.private_subnets_cidr_blocks
 }

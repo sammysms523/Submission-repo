@@ -49,28 +49,20 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+      # - name: Terraform Apply
+      #   run: terraform apply -auto-approve tfplan
 
   # deploy_n8n:
-  #   runs-on: [self-hosted, Linux]
+  #   runs-on: ubuntu-latest
   #   defaults:
   #     run:
-  #       working-directory: helm/n8n
+  #       working-directory: helm/live
   #   outputs:
   #     helm_deploy: ${{ steps.helm_deploy.outcome }}
 
   #   steps:
   #     - name: Checkout
   #       uses: actions/checkout@v5
-
-  #     - name: Map account name to account number
-  #       run: |
-  #         case "${{ github.event.inputs.account_name }}" in
-  #           live)   echo "AWS_ACCOUNT_NUMBER=779192211274" >> "$GITHUB_ENV" ;;
-  #           livedr) echo "AWS_ACCOUNT_NUMBER=741385553556" >> "$GITHUB_ENV" ;;
-  #           nonlive) echo "AWS_ACCOUNT_NUMBER=192256166295" >> "$GITHUB_ENV" ;;
-  #         esac
 
   #     - name: Setup Helm
   #       uses: azure/setup-helm@v4
@@ -85,13 +77,12 @@ jobs:
   #     - name: Configure AWS credentials
   #       uses: aws-actions/configure-aws-credentials@v5
   #       with:
-  #         aws-region: eu-central-1
-  #         role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_NUMBER }}:role/github_workflow_role
+  #         aws-region: ap-south-1
+  #         role-to-assume: arn:aws:iam::672911155582:role/github_workflow_role
   #         role-session-name: HelmDeploymentSessions
 
   #     - name: Set k8s context
-  #       run: aws eks --region eu-central-1 update-kubeconfig --name "lighthouse-tools-${{ github.event.inputs.account_name }}"
-
+  #       run: aws eks --region ap-south-1 update-kubeconfig --name "Submission-cluster-live"
   #     - name: Create n8n namespace
   #       run: |
   #         kubectl get namespace ${{ env.n8n_namespace }} || kubectl create namespace ${{ env.n8n_namespace }}
@@ -113,7 +104,7 @@ jobs:
   #         helm repo add n8n https://community-charts.github.io/helm-charts
   #         helm repo update
   #         helm plugin install https://github.com/databus23/helm-diff
-  #         helm upgrade --install --dry-run n8n n8n/n8n --version ${{ env.helm_chart_version }} --values "${{ github.event.inputs.account_name }}/values.yaml" --set postgresql.auth.password=${{ secrets.N8N_DB_PASSWORD }} -n ${{ env.n8n_namespace }}
+  #         helm upgrade --install --dry-run n8n n8n/n8n --version ${{ env.helm_chart_version }} --values "live/values.yaml" --set postgresql.auth.password=${{ secrets.N8N_DB_PASSWORD }} -n ${{ env.n8n_namespace }}
 
   #     - name: Start deployment
   #       if: steps.helm_dry_run.outcome == 'success'
@@ -122,13 +113,13 @@ jobs:
   #       with:
   #         step: start
   #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         env: ${{ env.product }}-${{ github.event.inputs.account_name }}
+  #         env: ${{ env.product }}-live
 
   #     - name: Deploy
   #       id: helm_deploy
   #       if: steps.helm_dry_run.outcome == 'success'
   #       run: |
-  #         helm upgrade --install n8n n8n/n8n --version ${{ env.helm_chart_version }} --values "${{ github.event.inputs.account_name }}/values.yaml" -n ${{ env.n8n_namespace }}
+  #         helm upgrade --install n8n n8n/n8n --version ${{ env.helm_chart_version }} --values "live/values.yaml" -n ${{ env.n8n_namespace }}
 
   #     - name: Update deployment status
   #       uses: bobheadxi/deployments@v1
