@@ -1,10 +1,7 @@
-name: Deploy N8N in EKS
+name: Deploy Infra
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
 concurrency:
   group: n8n-deployment
   cancel-in-progress: false
