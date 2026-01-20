@@ -11,7 +11,6 @@ module "eks" {
   cluster_ip_family          = var.eks_ipv6_enabled ? "ipv6" : "ipv4"
   create_cni_ipv6_iam_policy = var.eks_ipv6_enabled
 
-  cluster_endpoint_public_access_cidrs = var.common_allowlist_cidr_blocks
   cluster_enabled_log_types            = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
 

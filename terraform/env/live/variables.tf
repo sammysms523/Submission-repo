@@ -10,7 +10,7 @@ variable "home_region" {
 }
 
 variable "env" {
-  type = "live"
+  default = "live"
 }
 
 variable "vpc_ipv6_enabled" {
